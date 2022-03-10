@@ -5,24 +5,28 @@ import * as dat from './libs/dat.gui.module.js'
 import * as glutils from './glutils.js'
 import { imgload } from './imgload.js';
 
-//setup control object
-const settings = {black: 500, white: 500, zoom: 1};
 
-//create control interface
-const gui = new dat.GUI();
-gui.add(settings, 'black', 0, 1000);
-gui.add(settings, 'white', 0, 1000);
-gui.add(settings, 'zoom', 0.5, 2, .1);
-
-//Image load
 
 const vsSource = await (await fetch('vs.fx')).text();
 const fsSource = await (await fetch('fs.fx')).text();;
 
-const {gl, pr, vao} = init()
+//Image load
+const image = await imgload('img_016.dcm')
+
+//setup control object
+var minValue = Math.min(...image.pixelData)
+var maxValue = Math.max(...image.pixelData)
+const settings = {black: minValue, white: maxValue, zoom: 1};
+//create control interface
+const gui = new dat.GUI();
+gui.add(settings, 'black', minValue, maxValue);
+gui.add(settings, 'white', minValue, maxValue);
+gui.add(settings, 'zoom', 0.5, 2, .1);
+
+
+const {gl, pr, vao, bwLocation} = init()
 render()
 
-const image = await imgload('img_016.dcm')
 
 function init() {
     //get canvas ui element and set its internal resolution to align with its actual screen resolution
@@ -45,6 +49,21 @@ function init() {
     var pr = glutils.createProgram(gl, vs, fs);
     
     var positionAttributeLocation = gl.getAttribLocation(pr, "a_position");
+    var texLocation = gl.getUniformLocation(pr, "u_texture");
+    var bwLocation = gl.getUniformLocation(pr, "bw");
+
+    //Init texture
+      //-init texture object and fill with data
+      var texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, image.columns, image.rows, 0, gl.RED, gl.FLOAT, image.pixelData);
+
+      //-setup texture interpolation and wrapping modes
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
 
     const geometry = [
         0, 0, 
@@ -77,7 +96,7 @@ function init() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    return {gl, pr, vao}
+    return {gl, pr, vao, bwLocation}
 }
 
 function render() {
@@ -92,6 +111,8 @@ function render() {
     gl.useProgram(pr);
     //set geometry to draw
     gl.bindVertexArray(vao);
+
+    gl.uniform2fv(bwLocation, [settings.black, settings.white]);
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
