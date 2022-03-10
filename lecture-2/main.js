@@ -5,6 +5,8 @@ const importUMD = async (url, module = {exports:{}}) =>
   (Function('module', 'exports', await (await fetch(url)).text()).call(module, module, module.exports), module).exports
 const dicomParser = await importUMD('libs/dicomParser.min.js')
 
+import * as glutils from './glutils.js'
+
 //setup control object
 const settings = {black: 500, white: 500, zoom: 1};
 
@@ -90,10 +92,10 @@ function init() {
     var ext = gl.getExtension('OES_texture_float_linear');
 
     //-compile source code into shaders
-    var vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
-    var fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    var vs = glutils.createShader(gl, gl.VERTEX_SHADER, vsSource);
+    var fs = glutils.createShader(gl, gl.FRAGMENT_SHADER, fsSource);
     //-assemble shaders into program (pipeline)                                                                                
-    var pr = createProgram(gl, vs, fs);
+    var pr = glutils.createProgram(gl, vs, fs);
     
     var positionAttributeLocation = gl.getAttribLocation(pr, "a_position");
 
@@ -149,30 +151,6 @@ function render() {
     requestAnimationFrame(render)
 }
 
-function createShader(gl, type, source) {
-    var shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (success) {
-        return shader;
-    }
-    console.log(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-}
-
-function createProgram(gl, vertexShader, fragmentShader) {
-    var program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (success) {
-        return program;
-    }
-    console.log(gl.getProgramInfoLog(program));
-    gl.deleteProgram(program);
-}
 
 
 
