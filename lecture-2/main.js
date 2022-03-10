@@ -25,7 +25,7 @@ gui.add(settings, 'white', minValue, maxValue);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
 
-const {gl, pr, vao, bwLocation, transformLocation} = init()
+const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation} = init()
 render()
 
 
@@ -51,21 +51,34 @@ function init() {
     
     var positionAttributeLocation = gl.getAttribLocation(pr, "a_position");
     var texLocation = gl.getUniformLocation(pr, "u_texture");
+    var lutLocation = gl.getUniformLocation(pr, "u_lut");
     var bwLocation = gl.getUniformLocation(pr, "bw");
     var transformLocation = gl.getUniformLocation(pr, "transform");
 
     //Init texture
-      //-init texture object and fill with data
-      var texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, image.columns, image.rows, 0, gl.RED, gl.FLOAT, image.pixelData);
+    //-init texture object and fill with data
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, image.columns, image.rows, 0, gl.RED, gl.FLOAT, image.pixelData);
 
-      //-setup texture interpolation and wrapping modes
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    //-setup texture interpolation and wrapping modes
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    var lut = gl.createTexture();
+    var lutimage = new Image();
+    lutimage.src = 'lut/lut.png'
+    lutimage.onload = function() {
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, lut);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lutimage);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
 
     const geometry = [
         0, 0, 
@@ -98,7 +111,7 @@ function init() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    return {gl, pr, vao, bwLocation, transformLocation}
+    return {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation}
 }
 
 function render() {
@@ -126,6 +139,8 @@ function render() {
     mat3.scale(t, t, [settings.zoom, settings.zoom]);
     mat3.translate(t, t, [-.5, -.5])
     gl.uniformMatrix3fv(transformLocation, false, t);
+	gl.uniform1i(texLocation, 0);
+	gl.uniform1i(lutLocation, 1);
 
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
