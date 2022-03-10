@@ -1,10 +1,11 @@
 //Import libraries
 import * as dat from './libs/dat.gui.module.js'
+import './libs/gl-matrix-min.js'
+const mat3 = window.glMatrix.mat3
 
 //Import utility functions
 import * as glutils from './glutils.js'
 import { imgload } from './imgload.js';
-
 
 
 const vsSource = await (await fetch('vs.fx')).text();
@@ -24,7 +25,7 @@ gui.add(settings, 'white', minValue, maxValue);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
 
-const {gl, pr, vao, bwLocation} = init()
+const {gl, pr, vao, bwLocation, transformLocation} = init()
 render()
 
 
@@ -51,6 +52,7 @@ function init() {
     var positionAttributeLocation = gl.getAttribLocation(pr, "a_position");
     var texLocation = gl.getUniformLocation(pr, "u_texture");
     var bwLocation = gl.getUniformLocation(pr, "bw");
+    var transformLocation = gl.getUniformLocation(pr, "transform");
 
     //Init texture
       //-init texture object and fill with data
@@ -96,7 +98,7 @@ function init() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    return {gl, pr, vao, bwLocation}
+    return {gl, pr, vao, bwLocation, transformLocation}
 }
 
 function render() {
@@ -113,6 +115,18 @@ function render() {
     gl.bindVertexArray(vao);
 
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
+    var t = mat3.create()
+
+    var aspect = gl.canvas.width / gl.canvas.height;
+    var imgSize = [image.columns * image.pixelSpacingX, image.rows * image.pixelSpacingY]
+    var maxSize = Math.max(...imgSize);
+
+    mat3.scale(t, t, [1 / maxSize, -aspect / maxSize]);
+    mat3.scale(t, t, imgSize);
+    mat3.scale(t, t, [settings.zoom, settings.zoom]);
+    mat3.translate(t, t, [-.5, -.5])
+    gl.uniformMatrix3fv(transformLocation, false, t);
+
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
