@@ -118,7 +118,7 @@ function render() {
     //setup drawing area
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     //set clear color
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(.1, .1, .1, 1);
     //set clear mode (clear color & depth)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -134,10 +134,13 @@ function render() {
     var imgSize = [image.columns * image.pixelSpacingX, image.rows * image.pixelSpacingY]
     var maxSize = Math.max(...imgSize);
 
+    mat3.translate(t, t, [.5, .5])
+    mat3.scale(t, t, [.5, .5]);
     mat3.scale(t, t, [1 / maxSize, -aspect / maxSize]);
     mat3.scale(t, t, imgSize);
     mat3.scale(t, t, [settings.zoom, settings.zoom]);
     mat3.translate(t, t, [-.5, -.5])
+    mat3.invert(t, t)
     gl.uniformMatrix3fv(transformLocation, false, t);
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
