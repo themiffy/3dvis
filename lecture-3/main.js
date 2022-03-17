@@ -2,6 +2,7 @@
 import * as dat from './libs/dat.gui.module.js'
 import './libs/gl-matrix-min.js'
 const mat4 = window.glMatrix.mat4
+const vec3 = window.glMatrix.vec3
 
 //Import utility functions
 import * as glutils from './glutils.js'
@@ -24,10 +25,16 @@ gui.add(settings, 'black', minValue, maxValue);
 gui.add(settings, 'white', minValue, maxValue);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
+const slice = {
+    xort: [1, 0, 0],
+    yort: [0, 1, 0],
+    disp: 0 //displacement from center of the image in mm!!!
+}
+
+gui.add(slice, 'disp', -100, 100, 1);
 
 const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation} = init()
 render()
-
 
 function init() {
     //get canvas ui element and set its internal resolution to align with its actual screen resolution
@@ -138,9 +145,12 @@ function render() {
         image.slices * image.pixelSpacingZ]
     var maxSize = Math.max(...imgSize);
 
+    const st = sliceTransform(slice)
+
     mat4.translate(t, t, [.5, .5, .5])
     mat4.scale(t, t, [.5, .5, .5]);
     mat4.scale(t, t, [1 / maxSize, -aspect / maxSize, 1.0]);
+    mat4.mul(t, t, st)
     mat4.scale(t, t, imgSize);
     mat4.scale(t, t, [settings.zoom, settings.zoom, settings.zoom]);
     mat4.translate(t, t, [-.5, -.5, -.5])
@@ -153,6 +163,18 @@ function render() {
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
     requestAnimationFrame(render)
+}
+
+function sliceTransform(slice) {
+    var zort = vec3.cross(vec3.create(), slice.xort, slice.yort);
+    var rot = mat4.create();
+    mat4.set(rot, ...slice.xort, 0, ...slice.yort, 0, ...zort, 0, 0, 0, 0, 1);
+    mat4.invert(rot, rot)
+    var tr = mat4.fromTranslation(mat4.create(), [0, 0, slice.disp]);
+    var world = mat4.create();
+    //mat4.mul(world, rot, tr);
+    mat4.mul(world, tr, rot);
+    return world
 }
 
 
