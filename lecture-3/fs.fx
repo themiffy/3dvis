@@ -1,15 +1,16 @@
 #version 300 es
 precision highp float;
+precision highp sampler3D;
 
-in vec2 uv;
-uniform sampler2D u_texture;
+in vec3 uv;
+uniform sampler3D u_texture;
 uniform sampler2D u_lut;
 uniform vec2 bw;
 out vec4 color;
 
 void main() {
-    vec2 uv2 = step(0.0, uv) - (1.0 - step(uv, vec2(1.0)));
-    float cropValue = min(uv2.x, uv2.y); // 1.0 inside texture; 0.0 - outside
+    vec3 uv2 = step(0.0, uv) - (1.0 - step(uv, vec3(1.0)));
+    float cropValue = min(uv2.x, min(uv2.y, uv2.z)); // 1.0 inside texture; 0.0 - outside
     float val = cropValue * texture(u_texture, uv).r;
     val = (val - bw.x) / (bw.y - bw.x);
     //color = vec4(val, val, val, 1.0);

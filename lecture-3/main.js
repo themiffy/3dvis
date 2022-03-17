@@ -1,7 +1,7 @@
 //Import libraries
 import * as dat from './libs/dat.gui.module.js'
 import './libs/gl-matrix-min.js'
-const mat3 = window.glMatrix.mat3
+const mat4 = window.glMatrix.mat4
 
 //Import utility functions
 import * as glutils from './glutils.js'
@@ -58,14 +58,15 @@ function init() {
     //Init texture
     //-init texture object and fill with data
     var texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, image.columns, image.rows, 0, gl.RED, gl.FLOAT, image.pixelData);
+    gl.bindTexture(gl.TEXTURE_3D, texture);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, image.columns, image.rows, image.slices, 0, gl.RED, gl.FLOAT, image.pixelData);
 
     //-setup texture interpolation and wrapping modes
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
     var lut = gl.createTexture();
     var lutimage = new Image();
@@ -128,20 +129,23 @@ function render() {
     gl.bindVertexArray(vao);
 
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
-    var t = mat3.create()
+    var t = mat4.create()
 
     var aspect = gl.canvas.width / gl.canvas.height;
-    var imgSize = [image.columns * image.pixelSpacingX, image.rows * image.pixelSpacingY]
+    var imgSize = [
+        image.columns * image.pixelSpacingX, 
+        image.rows * image.pixelSpacingY, 
+        image.slices * image.pixelSpacingZ]
     var maxSize = Math.max(...imgSize);
 
-    mat3.translate(t, t, [.5, .5])
-    mat3.scale(t, t, [.5, .5]);
-    mat3.scale(t, t, [1 / maxSize, -aspect / maxSize]);
-    mat3.scale(t, t, imgSize);
-    mat3.scale(t, t, [settings.zoom, settings.zoom]);
-    mat3.translate(t, t, [-.5, -.5])
-    mat3.invert(t, t)
-    gl.uniformMatrix3fv(transformLocation, false, t);
+    mat4.translate(t, t, [.5, .5, .5])
+    mat4.scale(t, t, [.5, .5, .5]);
+    mat4.scale(t, t, [1 / maxSize, -aspect / maxSize, 1.0]);
+    mat4.scale(t, t, imgSize);
+    mat4.scale(t, t, [settings.zoom, settings.zoom, settings.zoom]);
+    mat4.translate(t, t, [-.5, -.5, -.5])
+    mat4.invert(t, t)
+    gl.uniformMatrix4fv(transformLocation, false, t);
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
 
