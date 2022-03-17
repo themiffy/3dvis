@@ -29,13 +29,25 @@ gui.add(settings, 'white', minValue, maxValue);
 gui.add(settings, 'distance', 100, 1000, 1);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
-const slice = {
+const sliceZ = {
     xort: [1, 0, 0],
     yort: [0, 1, 0],
     disp: 0 //displacement from center of the image in mm!!!
 }
+const sliceX = {
+    xort: [0, 1, 0],
+    yort: [0, 0, 1],
+    disp: 0 //displacement from center of the image in mm!!!
+}
+const sliceY = {
+    xort: [1, 0, 0],
+    yort: [0, 0, 1],
+    disp: 0 //displacement from center of the image in mm!!!
+}
 
-gui.add(slice, 'disp', -100, 100, 1);
+gui.add(sliceX, 'disp', -100, 100, 1);
+gui.add(sliceY, 'disp', -100, 100, 1);
+gui.add(sliceZ, 'disp', -100, 100, 1);
 
 const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation, wvpLocation} = init()
 render()
@@ -134,28 +146,19 @@ function render() {
     var vwp = mat4.create()
     mat4.scale(vwp, vwp, [2, 2, 1])
     mat4.translate(vwp, vwp, [-.5, -.5, 0])
-    let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
-    renderWithParameters(aspect, vwp)
+    let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
+    renderWithParameters(aspect, vwp, sliceZ)
+    aspect = initViewport({x: 0, y: gl.canvas.height / 3, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
+    renderWithParameters(aspect, vwp, sliceX)
+    aspect = initViewport({x: 0, y: 2 * gl.canvas.height / 3, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
+    renderWithParameters(aspect, vwp, sliceY)
 
-    let proj = mat4.perspective(mat4.create(), 0.5, gl.canvas.width / gl.canvas.height * .5, 0.1, 10000)
-    let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
-    let world = mat4.create()
-
-    var imgSize = [
-        image.columns * image.pixelSpacingX, 
-        image.rows * image.pixelSpacingY, 
-        image.slices * image.pixelSpacingZ]
-    mat4.mul(world, world, sliceTransform(slice));
-    mat4.scale(world, world, imgSize);
-    mat4.translate(world, world, [-.5, -.5, -.5])
+    let aspect3d = initViewport({x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
+    renderWithParameters(aspect, worldViewProjection(aspect, sliceZ), sliceZ)
     
-    vwp = mat4.create()
-    mat4.mul(vwp, vwp, proj);
-    mat4.mul(vwp, vwp, view);
-    mat4.mul(vwp, vwp, world);
+    renderWithParameters(aspect, worldViewProjection(aspect, sliceX), sliceX)
 
-    aspect = initViewport({x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
-    renderWithParameters(aspect, vwp)
+    renderWithParameters(aspect, worldViewProjection(aspect, sliceY), sliceY)
 
     requestAnimationFrame(render)
 }
@@ -172,33 +175,27 @@ function initViewport(region) {
     return region.width / region.height;
 }
 
-function renderWithParameters(aspect, wvp){
-
+function renderWithParameters(aspect, wvp, slice){
     //use graphic pipeline defined by shader program *pr*
     gl.useProgram(pr);
     //set geometry to draw
     gl.bindVertexArray(vao);
 
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
-    var t = mat4.create()
 
     var imgSize = [
         image.columns * image.pixelSpacingX, 
         image.rows * image.pixelSpacingY, 
         image.slices * image.pixelSpacingZ]
-    var maxSize = Math.max(...imgSize);
 
-    const st = sliceTransform(slice)
+    const world = worldSlice(aspect, slice)
+    const scaling = mat4.invert(mat4.create(), mat4.fromScaling(mat4.create(), imgSize))
+    const trans = mat4.fromTranslation(mat4.create(), [.5, .5, .5])
+    
+    mat4.mul(world, scaling, world)
+    mat4.mul(world, trans, world)
 
-    mat4.translate(t, t, [.5, .5, .5])
-    mat4.scale(t, t, [.5, .5, .5]);
-    mat4.scale(t, t, [1 / maxSize, -aspect / maxSize, 1.0]);
-    mat4.mul(t, t, st)
-    mat4.scale(t, t, imgSize);
-    mat4.scale(t, t, [settings.zoom, settings.zoom, settings.zoom]);
-    mat4.translate(t, t, [-.5, -.5, -.5])
-    mat4.invert(t, t)
-    gl.uniformMatrix4fv(transformLocation, false, t);
+    gl.uniformMatrix4fv(transformLocation, false, world);
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
 
@@ -211,12 +208,37 @@ function sliceTransform(slice) {
     var zort = vec3.cross(vec3.create(), slice.xort, slice.yort);
     var rot = mat4.create();
     mat4.set(rot, ...slice.xort, 0, ...slice.yort, 0, ...zort, 0, 0, 0, 0, 1);
-    mat4.invert(rot, rot)
+    //mat4.invert(rot, rot)
     var tr = mat4.fromTranslation(mat4.create(), [0, 0, slice.disp]);
     var world = mat4.create();
-    //mat4.mul(world, rot, tr);
-    mat4.mul(world, tr, rot);
+    mat4.mul(world, rot, tr);
+    //mat4.mul(world, tr, rot);
     return world
+}
+
+function worldSlice(aspect, slice) {
+    let world = mat4.create()
+
+    var imgSize = [
+        image.columns * image.pixelSpacingX, 
+        image.rows * image.pixelSpacingY, 
+        image.slices * image.pixelSpacingZ]
+    
+    var maxSize = Math.max(...imgSize);
+    mat4.mul(world, sliceTransform(slice), world);
+    mat4.scale(world, world, [maxSize * aspect, maxSize, 1]);
+    mat4.translate(world, world, [-.5, -.5, -.5])
+    return world
+}
+
+function worldViewProjection(aspect, slice) {
+    let proj = mat4.perspective(mat4.create(), 0.5, gl.canvas.width / gl.canvas.height * .5, 0.1, 10000)
+    let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
+    let vwp = mat4.create()
+    mat4.mul(vwp, vwp, proj);
+    mat4.mul(vwp, vwp, view);
+    mat4.mul(vwp, vwp, worldSlice(aspect, slice));
+    return vwp
 }
 
 
