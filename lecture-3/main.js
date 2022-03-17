@@ -18,11 +18,15 @@ const image = await imgload('HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img'
 //setup control object
 var minValue = 0;// Math.min(...image.pixelData)
 var maxValue = 1000; //Math.max(...image.pixelData)
-const settings = {black: minValue, white: maxValue, zoom: 1};
+const settings = {
+    black: minValue, white: maxValue, zoom: 1,
+    distance: 2000
+};
 //create control interface
 const gui = new dat.GUI();
 gui.add(settings, 'black', minValue, maxValue);
 gui.add(settings, 'white', minValue, maxValue);
+gui.add(settings, 'distance', 100, 1000, 1);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
 const slice = {
@@ -33,7 +37,7 @@ const slice = {
 
 gui.add(slice, 'disp', -100, 100, 1);
 
-const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation} = init()
+const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation, wvpLocation} = init()
 render()
 
 function init() {
@@ -61,6 +65,7 @@ function init() {
     var lutLocation = gl.getUniformLocation(pr, "u_lut");
     var bwLocation = gl.getUniformLocation(pr, "bw");
     var transformLocation = gl.getUniformLocation(pr, "transform");
+    var wvpLocation = gl.getUniformLocation(pr, "worldViewProjection");
 
     //Init texture
     //-init texture object and fill with data
@@ -122,22 +127,47 @@ function init() {
     //enable scsissor to prevent clearing of other viewports
     gl.enable(gl.SCISSOR_TEST);
 
-    return {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation}
+    return {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation, wvpLocation}
 }
 
 function render() {
+    var vwp = mat4.create()
+    mat4.scale(vwp, vwp, [2, 2, 1])
+    mat4.translate(vwp, vwp, [-.5, -.5, 0])
+    
     renderWithParameters(
-        {x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}
-    )
-    renderWithParameters(
-        {x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}
+        {x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}, 
+        vwp
     )
 
+    let proj = mat4.perspective(mat4.create(), 0.5, gl.canvas.width / gl.canvas.height * .5, 0.1, 10000)
+    let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
+    let world = mat4.create()
+
+    var imgSize = [
+        image.columns * image.pixelSpacingX, 
+        image.rows * image.pixelSpacingY, 
+        image.slices * image.pixelSpacingZ]
+    mat4.mul(world, world, sliceTransform(slice));
+    mat4.scale(world, world, imgSize);
+    mat4.translate(world, world, [-.5, -.5, -.5])
+    
+
+    vwp = mat4.create()
+    mat4.mul(vwp, vwp, proj);
+    mat4.mul(vwp, vwp, view);
+    mat4.mul(vwp, vwp, world);
+
+
+    renderWithParameters(
+        {x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height},
+        vwp
+    )
 
     requestAnimationFrame(render)
 }
 
-function renderWithParameters(region){
+function renderWithParameters(region, wvp){
     //setup drawing area
     gl.viewport(region.x, region.y, region.width, region.height);
     //
@@ -176,6 +206,7 @@ function renderWithParameters(region){
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
 
+    gl.uniformMatrix4fv(wvpLocation, false, wvp);
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 }
