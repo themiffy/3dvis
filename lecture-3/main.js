@@ -134,11 +134,8 @@ function render() {
     var vwp = mat4.create()
     mat4.scale(vwp, vwp, [2, 2, 1])
     mat4.translate(vwp, vwp, [-.5, -.5, 0])
-    
-    renderWithParameters(
-        {x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}, 
-        vwp
-    )
+    let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
+    renderWithParameters(aspect, vwp)
 
     let proj = mat4.perspective(mat4.create(), 0.5, gl.canvas.width / gl.canvas.height * .5, 0.1, 10000)
     let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
@@ -152,22 +149,18 @@ function render() {
     mat4.scale(world, world, imgSize);
     mat4.translate(world, world, [-.5, -.5, -.5])
     
-
     vwp = mat4.create()
     mat4.mul(vwp, vwp, proj);
     mat4.mul(vwp, vwp, view);
     mat4.mul(vwp, vwp, world);
 
-
-    renderWithParameters(
-        {x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height},
-        vwp
-    )
+    aspect = initViewport({x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
+    renderWithParameters(aspect, vwp)
 
     requestAnimationFrame(render)
 }
 
-function renderWithParameters(region, wvp){
+function initViewport(region) {
     //setup drawing area
     gl.viewport(region.x, region.y, region.width, region.height);
     //
@@ -176,6 +169,10 @@ function renderWithParameters(region, wvp){
     gl.clearColor(.1, .1, .1, 1);
     //set clear mode (clear color & depth)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    return region.width / region.height;
+}
+
+function renderWithParameters(aspect, wvp){
 
     //use graphic pipeline defined by shader program *pr*
     gl.useProgram(pr);
@@ -185,7 +182,6 @@ function renderWithParameters(region, wvp){
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
     var t = mat4.create()
 
-    var aspect = region.width / region.height;
     var imgSize = [
         image.columns * image.pixelSpacingX, 
         image.rows * image.pixelSpacingY, 
