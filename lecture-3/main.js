@@ -12,11 +12,11 @@ const vsSource = await (await fetch('vs.fx')).text();
 const fsSource = await (await fetch('fs.fx')).text();;
 
 //Image load
-const image = await imgload('img_016.dcm')
+const image = await imgload('HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img')
 
 //setup control object
-var minValue = Math.min(...image.pixelData)
-var maxValue = Math.max(...image.pixelData)
+var minValue = 0;// Math.min(...image.pixelData)
+var maxValue = 1000; //Math.max(...image.pixelData)
 const settings = {black: minValue, white: maxValue, zoom: 1};
 //create control interface
 const gui = new dat.GUI();
