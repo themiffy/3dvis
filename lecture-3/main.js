@@ -119,12 +119,29 @@ function init() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
+    //enable scsissor to prevent clearing of other viewports
+    gl.enable(gl.SCISSOR_TEST);
+
     return {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation}
 }
 
 function render() {
+    renderWithParameters(
+        {x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}
+    )
+    renderWithParameters(
+        {x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height}
+    )
+
+
+    requestAnimationFrame(render)
+}
+
+function renderWithParameters(region){
     //setup drawing area
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.viewport(region.x, region.y, region.width, region.height);
+    //
+    gl.scissor(region.x, region.y, region.width, region.height);
     //set clear color
     gl.clearColor(.1, .1, .1, 1);
     //set clear mode (clear color & depth)
@@ -138,7 +155,7 @@ function render() {
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
     var t = mat4.create()
 
-    var aspect = gl.canvas.width / gl.canvas.height;
+    var aspect = region.width / region.height;
     var imgSize = [
         image.columns * image.pixelSpacingX, 
         image.rows * image.pixelSpacingY, 
@@ -161,8 +178,6 @@ function render() {
 
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-
-    requestAnimationFrame(render)
 }
 
 function sliceTransform(slice) {
