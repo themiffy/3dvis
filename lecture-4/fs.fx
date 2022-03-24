@@ -18,12 +18,16 @@ void main() {
     vec3 o = eyePos;
     vec3 dir = normalize(uv - o);
 
-    float val = -32000.0;
+    vec4 res_color = vec4(0.0);
     for(int i = 0; i < NUM_SAMPLES; i++) {
-        val = max(val, texture(u_texture, pos).r);
+        float val = texture(u_texture, pos).r;
+        val = (val - bw.x) / (bw.y - bw.x);
+        float alpha = clamp(val, 0.0, 1.0);
+        
+        vec4 current_color = texture(u_lut, vec2(val, 0.5));
+        res_color = vec4(res_color.rgb * res_color.a + current_color.rgb * (1.0 - res_color.a), clamp(res_color.a + alpha, 0.0, 1.0));
         pos += dir * step;
         if(clamp(pos, 0.0, 1.0) != pos) break;
     }
-    val = (val - bw.x) / (bw.y - bw.x);
-    color = texture(u_lut, vec2(val, 0.5));
+    color = res_color;
 }
