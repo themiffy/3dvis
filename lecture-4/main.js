@@ -34,7 +34,7 @@ gui.add(settings, 'rotX', 0, 360, 1);
 gui.add(settings, 'rotY', 0, 360, 1);
 gui.add(settings, 'rotZ', 0, 360, 1);
 
-const {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation} = init()
+const {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation, eyePosLocation} = init()
 render()
 
 function init() {
@@ -62,6 +62,8 @@ function init() {
     var lutLocation = gl.getUniformLocation(pr, "u_lut");
     var bwLocation = gl.getUniformLocation(pr, "bw");
     var wvpLocation = gl.getUniformLocation(pr, "worldViewProjection");
+    var eyePosLocation = gl.getUniformLocation(pr, "eyePos");
+    
 
     //Init texture
     //-init texture object and fill with data
@@ -137,12 +139,12 @@ function init() {
     //enable scsissor to prevent clearing of other viewports
     gl.enable(gl.SCISSOR_TEST);
 
-    return {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation}
+    return {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation, eyePosLocation}
 }
 
 function render() {
     let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width, height: gl.canvas.height})
-    renderWithParameters(worldViewProjection(aspect))
+    renderWithParameters(worldMatrix(), viewMatrix(), projectionMatrix(aspect))
     requestAnimationFrame(render)
 }
 
@@ -158,13 +160,26 @@ function initViewport(region) {
     return region.width / region.height;
 }
 
-function renderWithParameters(wvp){
+function renderWithParameters(world, view, proj){
+    let wvp = mat4.create()
+    mat4.mul(wvp, wvp, proj);
+    mat4.mul(wvp, wvp, view);
+    mat4.mul(wvp, wvp, world);
+
     //use graphic pipeline defined by shader program *pr*
     gl.useProgram(pr);
     //set geometry to draw
     gl.bindVertexArray(vao);
 
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
+
+    let iv = mat4.invert(mat4.create(), view)
+    let iw = mat4.invert(mat4.create(), world)
+    var m = mat4.mul(mat4.create(), iw, iv);
+
+    let eye = vec3.transformMat4(vec3.create(), [0, 0, 0], m);
+
+    gl.uniform3fv(eyePosLocation, eye);
 
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
@@ -182,24 +197,22 @@ function worldMatrix() {
         image.rows * image.pixelSpacingY, 
         image.slices * image.pixelSpacingZ]
     
-    mat4.rotateX(world, world, settings.rotX / 180 * Math.PI)
-    mat4.rotateY(world, world, settings.rotY / 180 * Math.PI)
-    mat4.rotateZ(world, world, settings.rotZ / 180 * Math.PI)
     mat4.scale(world, world, imgSize);
     mat4.translate(world, world, [-.5, -.5, -.5])
     return world
 }
 
-function worldViewProjection(aspect) {
-    let proj = mat4.perspective(mat4.create(), 0.5, aspect, 0.1, 10000)
+function viewMatrix() {
     let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
-    let vwp = mat4.create()
-    mat4.mul(vwp, vwp, proj);
-    mat4.mul(vwp, vwp, view);
-    mat4.mul(vwp, vwp, worldMatrix());
-    return vwp
+    mat4.rotateX(view, view, settings.rotX / 180 * Math.PI)
+    mat4.rotateY(view, view, settings.rotY / 180 * Math.PI)
+    mat4.rotateZ(view, view, settings.rotZ / 180 * Math.PI)
+    return view
 }
 
+function projectionMatrix(aspect) {
+    return mat4.perspective(mat4.create(), 0.5, aspect, 0.1, 10000)
+}
 
 
 
