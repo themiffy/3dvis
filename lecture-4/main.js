@@ -20,6 +20,7 @@ var minValue = 0;// Math.min(...image.pixelData)
 var maxValue = 1000; //Math.max(...image.pixelData)
 const settings = {
     black: minValue, white: maxValue, zoom: 1,
+    rotX: 0, rotY: 0, rotZ: 0, 
     distance: 2000
 };
 //create control interface
@@ -29,27 +30,11 @@ gui.add(settings, 'white', minValue, maxValue);
 gui.add(settings, 'distance', 100, 1000, 1);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
-const sliceZ = {
-    xort: [1, 0, 0],
-    yort: [0, 1, 0],
-    disp: 0 //displacement from center of the image in mm!!!
-}
-const sliceX = {
-    xort: [0, 1, 0],
-    yort: [0, 0, 1],
-    disp: 0 //displacement from center of the image in mm!!!
-}
-const sliceY = {
-    xort: [1, 0, 0],
-    yort: [0, 0, 1],
-    disp: 0 //displacement from center of the image in mm!!!
-}
+gui.add(settings, 'rotX', 0, 360, 1);
+gui.add(settings, 'rotY', 0, 360, 1);
+gui.add(settings, 'rotZ', 0, 360, 1);
 
-gui.add(sliceX, 'disp', -100, 100, 1);
-gui.add(sliceY, 'disp', -100, 100, 1);
-gui.add(sliceZ, 'disp', -100, 100, 1);
-
-const {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation, wvpLocation} = init()
+const {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation} = init()
 render()
 
 function init() {
@@ -76,7 +61,6 @@ function init() {
     var texLocation = gl.getUniformLocation(pr, "u_texture");
     var lutLocation = gl.getUniformLocation(pr, "u_lut");
     var bwLocation = gl.getUniformLocation(pr, "bw");
-    var transformLocation = gl.getUniformLocation(pr, "transform");
     var wvpLocation = gl.getUniformLocation(pr, "worldViewProjection");
 
     //Init texture
@@ -106,15 +90,29 @@ function init() {
     }
 
     const geometry = [
-        0, 0, 
-        1, 0,
-        1, 1,
-        0, 1
+		0, 1, 0,
+        1, 1, 0,
+        0, 0, 0,
+        1, 0, 0,
+        0, 1, 1,
+        1, 1, 1,
+        0, 0, 1,
+        1, 0, 1,
     ]
 
     const triangles = [
-        0, 1, 2, 
-        0, 3, 2
+		0, 1, 2,
+        1, 2, 3,
+        2, 3, 6,
+        3, 6, 7,
+        6, 7, 4,
+        7, 4, 5,
+        4, 5, 0,
+        5, 0, 1,
+        1, 3, 5,
+        3, 5, 7,
+        0, 4, 2,
+        4, 2, 6
     ]
 
     //-create vertex array to store geometry data
@@ -126,7 +124,7 @@ function init() {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry), gl.STATIC_DRAW);
     //-assign buffer to position attribute
     gl.enableVertexAttribArray(positionAttributeLocation);
-    gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 0, 0);
     //-init index buffer and fill with data
     var indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -139,27 +137,12 @@ function init() {
     //enable scsissor to prevent clearing of other viewports
     gl.enable(gl.SCISSOR_TEST);
 
-    return {gl, pr, vao, bwLocation, transformLocation, texLocation, lutLocation, wvpLocation}
+    return {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation}
 }
 
 function render() {
-    var vwp = mat4.create()
-    mat4.scale(vwp, vwp, [2, 2, 1])
-    mat4.translate(vwp, vwp, [-.5, -.5, 0])
-    let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
-    renderWithParameters(aspect, vwp, sliceZ)
-    aspect = initViewport({x: 0, y: gl.canvas.height / 3, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
-    renderWithParameters(aspect, vwp, sliceX)
-    aspect = initViewport({x: 0, y: 2 * gl.canvas.height / 3, width: gl.canvas.width / 2, height: gl.canvas.height / 3})
-    renderWithParameters(aspect, vwp, sliceY)
-
-    let aspect3d = initViewport({x: gl.canvas.width / 2, y: 0, width: gl.canvas.width / 2, height: gl.canvas.height})
-    renderWithParameters(aspect, worldViewProjection(aspect, sliceZ), sliceZ)
-    
-    renderWithParameters(aspect, worldViewProjection(aspect, sliceX), sliceX)
-
-    renderWithParameters(aspect, worldViewProjection(aspect, sliceY), sliceY)
-
+    let aspect = initViewport({x: 0, y: 0, width: gl.canvas.width, height: gl.canvas.height})
+    renderWithParameters(worldViewProjection(aspect))
     requestAnimationFrame(render)
 }
 
@@ -175,7 +158,7 @@ function initViewport(region) {
     return region.width / region.height;
 }
 
-function renderWithParameters(aspect, wvp, slice){
+function renderWithParameters(wvp){
     //use graphic pipeline defined by shader program *pr*
     gl.useProgram(pr);
     //set geometry to draw
@@ -183,40 +166,15 @@ function renderWithParameters(aspect, wvp, slice){
 
     gl.uniform2fv(bwLocation, [settings.black, settings.white]);
 
-    var imgSize = [
-        image.columns * image.pixelSpacingX, 
-        image.rows * image.pixelSpacingY, 
-        image.slices * image.pixelSpacingZ]
-
-    const world = worldSlice(aspect, slice)
-    const scaling = mat4.invert(mat4.create(), mat4.fromScaling(mat4.create(), imgSize))
-    const trans = mat4.fromTranslation(mat4.create(), [.5, .5, .5])
-    
-    mat4.mul(world, scaling, world)
-    mat4.mul(world, trans, world)
-
-    gl.uniformMatrix4fv(transformLocation, false, world);
 	gl.uniform1i(texLocation, 0);
 	gl.uniform1i(lutLocation, 1);
 
     gl.uniformMatrix4fv(wvpLocation, false, wvp);
 
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 }
 
-function sliceTransform(slice) {
-    var zort = vec3.cross(vec3.create(), slice.xort, slice.yort);
-    var rot = mat4.create();
-    mat4.set(rot, ...slice.xort, 0, ...slice.yort, 0, ...zort, 0, 0, 0, 0, 1);
-    //mat4.invert(rot, rot)
-    var tr = mat4.fromTranslation(mat4.create(), [0, 0, slice.disp]);
-    var world = mat4.create();
-    mat4.mul(world, rot, tr);
-    //mat4.mul(world, tr, rot);
-    return world
-}
-
-function worldSlice(aspect, slice) {
+function worldMatrix() {
     let world = mat4.create()
 
     var imgSize = [
@@ -224,20 +182,21 @@ function worldSlice(aspect, slice) {
         image.rows * image.pixelSpacingY, 
         image.slices * image.pixelSpacingZ]
     
-    var maxSize = Math.max(...imgSize);
-    mat4.mul(world, sliceTransform(slice), world);
-    mat4.scale(world, world, [maxSize * aspect, maxSize, 1]);
+    mat4.rotateX(world, world, settings.rotX / 180 * Math.PI)
+    mat4.rotateY(world, world, settings.rotY / 180 * Math.PI)
+    mat4.rotateZ(world, world, settings.rotZ / 180 * Math.PI)
+    mat4.scale(world, world, imgSize);
     mat4.translate(world, world, [-.5, -.5, -.5])
     return world
 }
 
-function worldViewProjection(aspect, slice) {
-    let proj = mat4.perspective(mat4.create(), 0.5, gl.canvas.width / gl.canvas.height * .5, 0.1, 10000)
+function worldViewProjection(aspect) {
+    let proj = mat4.perspective(mat4.create(), 0.5, aspect, 0.1, 10000)
     let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
     let vwp = mat4.create()
     mat4.mul(vwp, vwp, proj);
     mat4.mul(vwp, vwp, view);
-    mat4.mul(vwp, vwp, worldSlice(aspect, slice));
+    mat4.mul(vwp, vwp, worldMatrix());
     return vwp
 }
 
