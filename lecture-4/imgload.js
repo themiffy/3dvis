@@ -10,6 +10,7 @@ function parseByteArray(byteArray) {
         var img = {
             rows: 256, columns: 216, slices: 32, 
             pixelSpacingX: 0.9, pixelSpacingY: 0.9, pixelSpacingZ: 5, 
+            xort: [-1, 0, 0], yort: [0, 1, 0], zort: [0, 0, 1],
             pixelData: []};
 
         img.pixelData = new Uint16Array(byteArray.buffer, 0, img.rows * img.columns * img.slices);

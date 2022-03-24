@@ -191,6 +191,7 @@ function renderWithParameters(world, view, proj){
 
 function worldMatrix() {
     let world = mat4.create()
+    mat4.set(world, ...image.xort, 0, ...image.yort, 0, ...image.zort, 0, 0, 0, 0, 1);
 
     var imgSize = [
         image.columns * image.pixelSpacingX, 
