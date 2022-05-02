@@ -8,8 +8,8 @@ const vec3 = window.glMatrix.vec3
 import * as glutils from './glutils.js'
 import { imgload } from './imgload.js';
 
-var THETA = 100,
-PHI = 500;
+var THETA = 0,
+PHI = 0;
 
 var drag = false;
 var old_x, old_y;
@@ -29,29 +29,7 @@ var window_width = 500
 var window_level = 500
 var black = window_level - window_width/2
 var white = window_level + window_width/2
-
-var mouseMove = function(e) {
-   if (!drag) return false;
-   dX = (e.pageX-old_x)*2*Math.PI/canvas.width, //
-   dY = (e.pageY-old_y)*2*Math.PI/canvas.height; //
-   THETA+= dX;
-   PHI+=-dY;
-   old_x = e.pageX, old_y = e.pageY;
-   e.preventDefault();
-   
-   settings.rotZ = 180 * THETA
-   settings.rotX = 180 * -PHI
-   /*window_width = THETA
-   window_level = PHI
-   settings.black = window_level - window_width/2
-   settings.white = window_level + window_width/2
-   console.log('Width:', window_width, 'Level:', window_level)*/
-};
-
-canvas.addEventListener("mousedown", mouseDown, false);
-canvas.addEventListener("mouseup", mouseUp, false);
-canvas.addEventListener("mouseout", mouseUp, false);
-canvas.addEventListener("mousemove", mouseMove, false);
+const degToRad = Math.PI / 180;
 
 var files = {image: 'HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img'} // ????
 
@@ -285,14 +263,19 @@ function worldMatrix() {
     
     mat4.scale(world, world, imgSize);
     mat4.translate(world, world, [-.5, -.5, -.5])
+
     return world
 }
 
 function viewMatrix() {
-    let view = mat4.lookAt(mat4.create(), [settings.distance, settings.distance, settings.distance], [0, 0, 0], [0, 0, 1]);
+    let camX = Math.sin(THETA) * settings.distance;
+    let camZ = Math.cos(PHI) * settings.distance;
+    let view = mat4.lookAt(mat4.create(), [camX, settings.distance, camZ], [0, 0, 0], [0, 0, 1]);
+    
     mat4.rotateX(view, view, settings.rotX / 180 * Math.PI)
     mat4.rotateY(view, view, settings.rotY / 180 * Math.PI)
     mat4.rotateZ(view, view, settings.rotZ / 180 * Math.PI)
+
     return view
 }
 
@@ -300,4 +283,19 @@ function projectionMatrix(aspect) {
     return mat4.perspective(mat4.create(), 0.5, aspect, 0.1, 10000)
 }
 }
+var mouseMove = function(e) {
+    if (!drag) return false;
+    dX = (e.pageX-old_x)*2*Math.PI/canvas.width, //
+    dY = (e.pageY-old_y)*2*Math.PI/canvas.height; //
+    THETA+= dX;
+    PHI+=-dY;
+    old_x = e.pageX, old_y = e.pageY;
+    e.preventDefault();
+ };
+
+canvas.addEventListener("mousedown", mouseDown, false);
+canvas.addEventListener("mouseup", mouseUp, false);
+canvas.addEventListener("mouseout", mouseUp, false);
+canvas.addEventListener("mousemove", mouseMove, false);
 refresh()
+
