@@ -8,25 +8,86 @@ const vec3 = window.glMatrix.vec3
 import * as glutils from './glutils.js'
 import { imgload } from './imgload.js';
 
+var THETA = 100,
+PHI = 500;
 
-const vsSource = await (await fetch('vs.fx')).text();
-const fsSource = await (await fetch('fs.fx')).text();;
+var drag = false;
+var old_x, old_y;
+var dX = 0, dY = 0;
 
-//Image load
-const image = await imgload('HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img')
+var mouseDown = function(e) {
+   drag = true;
+   old_x = e.pageX, old_y = e.pageY;
+   e.preventDefault();
+   return false;
+};
+
+var mouseUp = function(e){
+   drag = false;
+};
+var window_width = 500
+var window_level = 500
+var black = window_level - window_width/2
+var white = window_level + window_width/2
+
+var mouseMove = function(e) {
+   if (!drag) return false;
+   dX = (e.pageX-old_x)*2*Math.PI/canvas.width, //
+   dY = (e.pageY-old_y)*2*Math.PI/canvas.height; //
+   THETA+= dX;
+   PHI+=-dY;
+   old_x = e.pageX, old_y = e.pageY;
+   e.preventDefault();
+   
+   settings.rotZ = 180 * THETA
+   settings.rotX = 180 * -PHI
+   /*window_width = THETA
+   window_level = PHI
+   settings.black = window_level - window_width/2
+   settings.white = window_level + window_width/2
+   console.log('Width:', window_width, 'Level:', window_level)*/
+};
+
+canvas.addEventListener("mousedown", mouseDown, false);
+canvas.addEventListener("mouseup", mouseUp, false);
+canvas.addEventListener("mouseout", mouseUp, false);
+canvas.addEventListener("mousemove", mouseMove, false);
+
+var files = {image: 'HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img'} // ????
+
+const head = {path:'HEAD_BRAIN_20101020_001_004_T2__Ax_T2_Flair_Ax.img',
+            rows: 256, columns: 216, slices: 32, is16 : true,
+            psX: 0.9, psY: 0.9, psZ: 5
+}
+const avg = {path:'avg.ndif',
+            rows: 109, columns: 91, slices: 91, is16 : false,
+            psX: 2, psY: 2, psZ: 2
+}
+const BMR = {path:'BRAIN_MR.ndif',
+            rows: 192, columns: 192, slices: 256, is16 : true,
+            psX: 1, psY: 1, psZ: 1}
 
 //setup control object
-var minValue = 0;// Math.min(...image.pixelData)
+var minValue = 10;// Math.min(...image.pixelData)
 var maxValue = 1000; //Math.max(...image.pixelData)
-const settings = {
-    black: minValue, white: maxValue, zoom: 1,
+var settings = {
+    black: black, white: white, zoom: 1,
     rotX: 0, rotY: 0, rotZ: 0, 
     distance: 2000
 };
+
 //create control interface
+
 const gui = new dat.GUI();
-gui.add(settings, 'black', minValue, maxValue);
-gui.add(settings, 'white', minValue, maxValue);
+gui.add(files, 'image', {   'HEAD_BRAIN': 1,
+                            'avg': 2,
+                            'BRAIN_MR': 3
+                        } ).listen().onChange(function() {
+                            refresh()
+                     
+                        });
+gui.add(settings, 'black', minValue, maxValue).listen();
+gui.add(settings, 'white', minValue, maxValue).listen();
 gui.add(settings, 'distance', 100, 1000, 1);
 gui.add(settings, 'zoom', 0.5, 2, .1);
 
@@ -34,8 +95,31 @@ gui.add(settings, 'rotX', 0, 360, 1);
 gui.add(settings, 'rotY', 0, 360, 1);
 gui.add(settings, 'rotZ', 0, 360, 1);
 
-const {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation, eyePosLocation} = init()
-render()
+async function  refresh(){
+    const vsSource = await (await fetch('vs.fx')).text();
+    const fsSource = await (await fetch('fs.fx')).text();
+    let active_image;
+    //Image load
+    switch (files.image){
+        case '1': 
+            active_image = head
+            break;
+        case '2': 
+            active_image = avg
+            break;
+        case '3': 
+            active_image = BMR
+            break;
+        default:
+            active_image = head
+    }
+
+    var image = await imgload(active_image.path, active_image.rows, active_image.columns, active_image.slices, active_image.is16, active_image.psX, active_image.psY, active_image.psZ)
+
+    
+    const {gl, pr, vao, bwLocation, texLocation, lutLocation, wvpLocation, eyePosLocation} = init()
+    render()
+
 
 function init() {
     //get canvas ui element and set its internal resolution to align with its actual screen resolution
@@ -69,6 +153,7 @@ function init() {
     //-init texture object and fill with data
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, texture);
+    gl.activeTexture(gl.TEXTURE0)
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, image.columns, image.rows, image.slices, 0, gl.RED, gl.FLOAT, image.pixelData);
 
     //-setup texture interpolation and wrapping modes
@@ -214,10 +299,5 @@ function viewMatrix() {
 function projectionMatrix(aspect) {
     return mat4.perspective(mat4.create(), 0.5, aspect, 0.1, 10000)
 }
-
-
-
-
-
-
-
+}
+refresh()
