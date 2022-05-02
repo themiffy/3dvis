@@ -64,7 +64,7 @@ const avg = {path:'avg.ndif',
             psX: 2, psY: 2, psZ: 2
 }
 const BMR = {path:'BRAIN_MR.ndif',
-            rows: 192, columns: 192, slices: 256, is16 : true,
+            rows: 256, columns: 192, slices: 192, is16 : true,
             psX: 1, psY: 1, psZ: 1}
 
 //setup control object
